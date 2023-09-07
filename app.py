@@ -2,7 +2,13 @@ from flask import Flask, jsonify, request
 from flask_restful import Resource, Api
 import pymongo
 
+import os
 from exception import ApiException, BadRequestException, ConflictException, NotFoundException
+
+
+mongodb_host = os.environ.get('MONGO_HOST', 'localhost')
+client = pymongo.MongoClient(mongodb_host, port=27017)
+db = client.corider_db
 
 
 app = Flask(__name__)
@@ -23,10 +29,6 @@ def handle_general_exception(err):
         "code": 404
     }
     return response, response['code']
-
-
-client = pymongo.MongoClient("mongodb://localhost:27017/")
-db = client.corider_db
 
 
 class Index(Resource):
@@ -55,10 +57,10 @@ class Users(Resource):
             if not user:
                 raise NotFoundException("id {} not found".format(id))
             else:
-                response = {}
-                response['data'] = user
+                response = {
+                    'data': user
+                }
         return response, 200
-
 
     def put(self, id=None):
         if not id:
@@ -70,12 +72,10 @@ class Users(Resource):
         else:
             new_value = {"$set": request.json}
             db.users.update_one({'id': id}, new_value)
-            db.users.save
             response = {
                 "message": "Object got modified".format(id)
             }
             return response, 200
-
 
     def post(self, id=None):
         if id:
@@ -84,7 +84,6 @@ class Users(Resource):
             raise ConflictException("id {} aldreay present".format(request.json['id']))
         else:
             db.users.insert_one(request.json)
-            db.users.save
             response = {
                 "message": "Object added successfully"
             }
@@ -98,12 +97,10 @@ class Users(Resource):
             raise NotFoundException("id {} not found".format(id))
         else:
             db.users.delete_one({'id': id})
-            db.users.save
             response = {
                 "message": "Object deleted successfully"
             }
         return response, 200
-
 
 
 api.add_resource(Index, '/', endpoint="index")
@@ -112,7 +109,7 @@ api.add_resource(Users, '/api/users', endpoint='get_all_users')
 api.add_resource(Users, '/api/users/<int:id>', endpoint='user')
 
 
-
 app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RV'
 if __name__ == "__main__":
-    app.run(debug=True)
+    debug = False if os.environ.get('FLASK_ENV', 'dev') == 'prod' else True
+    app.run(host="0.0.0.0", port=5000, debug=debug)
